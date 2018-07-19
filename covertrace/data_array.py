@@ -114,7 +114,7 @@ class Sites(OrderedDict):
     def drop_prop(self, pid=1):
         for key, arr in self.iteritems():
             mask = np.max(arr.prop, axis=-1) == pid
-            narr = DataArray(arr[:, -mask, :], arr.labels)
+            narr = DataArray(arr[:, ~mask, :], arr.labels)
             narr._set_extra_attr(narr, arr)
             self[key] = narr
         self._set_keys2attr()

@@ -45,7 +45,7 @@ def filter_frames_by_range(arr, LOWER=-10000, UPPER=np.Inf, FRAME_START=0, FRAME
     if isinstance(FRAME_END, int):
         arr_bool[:, FRAME_END:] = True
     arr_bool[np.isnan(arr)] = True  # ignore nan
-    return -arr_bool
+    return ~arr_bool
 
 
 @modify_prop
@@ -63,7 +63,7 @@ def cut_short_traces(arr, MINFRAME=5, FRAME_START=0, FRAME_END=None):
 
     arr = arr[:, FRAME_START:FRAME_END]
 
-    short_idx = (-np.isnan(arr)).sum(axis=1) < MINFRAME
+    short_idx = (~np.isnan(arr)).sum(axis=1) < MINFRAME
     arr_bool[short_idx, :] = True
     return arr_bool
 
@@ -88,7 +88,7 @@ def filter_frames_by_stats(arr, func=np.nanmean, LOWER=-np.Inf, UPPER=np.Inf, FR
     if isinstance(FRAME_END, int):
         arr_bool[:, FRAME_END:] = True
     arr_bool[np.isnan(arr)] = True  # ignore nan
-    return -arr_bool
+    return ~arr_bool
 
 
 @modify_prop
@@ -116,7 +116,7 @@ def filter_frames_by_percentile_stats(arr, func=np.nanmean, LOWER=0, UPPER=100, 
     if isinstance(FRAME_END, int):
         arr_bool[:, FRAME_END:] = True
     arr_bool[np.isnan(arr)] = True  # ignore nan
-    return -arr_bool
+    return ~arr_bool
 
 
 @modify_prop

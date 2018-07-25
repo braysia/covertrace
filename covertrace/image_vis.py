@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from matplotlib import animation, rc
+from IPython.display import HTML
 import numpy as np
 
 # Add visualizing division and unconfident tracking.
@@ -38,6 +40,17 @@ class ImageVis(object):
         img = ch_img[y_ran, x_ran]
         return img
 
+    def show_single_cell_movie(self, label_id=1, MARGIN=30, numframes=0):
+        images = [show_single_cell(self, label_id, MARGIN, frame) for frame in numframes]
+        return images
+
+    def animate_single_cell_movie(self, fig, ax, label_id=1, MARGIN=30, numframes=0):
+        frames = self.show_single_cell_movie(self, label_id, MARGIN, numframes)
+        def animate(i):
+            ax.imshow(frames[i])
+        animation = matplotlib.animation.FuncAnimation(fig, animate, frames=numframes)
+        return animation
+
 
 def slice_adjust_margin(x, maximum, MARGIN):
     """Return a slice defined by x-MARGIN and x+MARGIN.
@@ -53,3 +66,4 @@ def slice_adjust_margin(x, maximum, MARGIN):
     LOW = x - MARGIN if x-MARGIN >= 0 else 0
     HIGH = x + MARGIN if x+MARGIN < maximum else maximum
     return slice(LOW, HIGH)
+

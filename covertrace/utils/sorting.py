@@ -10,10 +10,10 @@ def calc_distance_sqerror(arr, dist_func_name='cosine'):
     num_cells = arr.shape[1]
     for num1 in xrange(num_cells):
         ts1 = arr[:, num1]
-        ts1 = ts1[-np.isnan(ts1)]
+        ts1 = ts1[~np.isnan(ts1)]
         for num2 in xrange(num_cells):
             ts2 = arr[:, num2]
-            ts2 = ts2[-np.isnan(ts2)]
+            ts2 = ts2[~np.isnan(ts2)]
             mts1, mts2 = fill_short_series(ts1, ts2)
             min_frame = min(len(ts1), len(ts2))
             distance[num1, num2] = dist_func(mts1, mts2) / min_frame

@@ -132,6 +132,10 @@ class Sites(OrderedDict):
                     larr = larr.add_prop(label, arr)
                 self[pos] = larr
         self._set_keys2attr()
+        
+    def blank_prop(self):
+        for key, arr in self.iteritems():
+            arr.prop = np.zeros(arr.prop.shape)
 
 
 def darray_read(path):

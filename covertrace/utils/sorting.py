@@ -28,3 +28,22 @@ def fill_short_series(ts1, ts2):
     elif diff_len > 0:
         ts2 = np.tile(ts2, TILE)[:len(ts2)+diff_len]
     return ts1, ts2
+
+def apply_clusters(clusters, arr):
+    re_arr = np.zeros([arr.shape[0], arr.shape[1]])
+    
+    ind = 0 
+    
+    for i in range(0,len(clusters)):
+        for j in clusters[i][1]:
+            re_arr[ind,:] = arr[j, :]
+            ind += 1
+            
+    return re_arr
+
+def kshape_clusters(arr, cluster_num, ax=1):
+    from kshape.core import kshape, zscore
+    clusters = kshape(zscore(arr, ax), cluster_num)
+    re_arr = apply_clusters(clusters, arr)
+    return re_arr
+    

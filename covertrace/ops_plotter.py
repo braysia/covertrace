@@ -4,6 +4,7 @@ import seaborn as sns
 import numpy as np
 from collections import OrderedDict
 from utils.canvas import canvas
+from utils.sorting import kshape_clusters
 
 
 def odict2prop_list(odict):
@@ -40,7 +41,17 @@ def plot_all(arr, ax=None, **kwargs):
 def plot_heatmap(arr, ax=None, **kwargs):
     sns.heatmap(arr, ax=ax, **kwargs)
 
-
+    
+@iterate_axes
+def plot_sorted_heatmap(arr, ax=None, num_clusters=3, **kwargs):
+    """
+    Uses kshape to cluster traces based on general shape
+    Removes any traces with nans to ensure better sorting of shape
+    """
+    no_nan_arr = arr[~np.isnan(arr).any(axis=1)]
+    sort_arr = kshape_clusters(no_nan_arr, num_clusters)
+    sns.heatmap(sort_arr, ax=ax, **kwargs)
+    
 @iterate_axes
 def plot_tsplot(arr, ax=None, **kwargs):
     """

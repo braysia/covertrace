@@ -10,17 +10,17 @@ def get_id_dic(id_array):
         
     return id_dic
 
-def connect_parent_daughter(sites):
+def connect_parent_daughter(sites, cell_label='nuclei', channel='TRITC'):
     #goes in order through the set of cells
     #concatenates parent trace to the front of the daughter trace, at the frame where division is detected
     
     for pos, larr in sites.iteritems():
         print pos, larr.shape
         labels = larr.labels
-        id_index = get_id_dic(larr['nuclei', 'TRITC', 'cell_id'])
+        id_index = get_id_dic(larr[cell_label, channel, 'cell_id'])
         to_blank = []
         
-        for child_idx, l in enumerate(larr['nuclei', 'TRITC', 'parent']):
+        for child_idx, l in enumerate(larr[cell_label, channel, 'parent']):
             #print child_idx
             division_frame = np.where(~np.isnan(l)) 
             if len(division_frame[0]) > 0:

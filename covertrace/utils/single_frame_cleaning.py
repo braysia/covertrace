@@ -27,10 +27,9 @@ def filter_by_percent_single_frame(arr, LOWER=0, UPPER=100):
     return ~mask
 
 def remove_props_single_frame(site, pid=1):
-    #used in conjunction with the drop_prop and blank_prop properties of Sites
+    #used instead of drop_prop function of Sites class.
     #input for this function is Sites - remove_props_single_frame(all_sites)
-    #labels all props, which can then be removed from the Sites object - all_sites.drop_prop()
-    #can also be reset in the Sites object - all_sites.blank_prop()
+    #can still be reset in the Sites object - all_sites.blank_prop()
     for key, val in site.iteritems():
         mask = np.max(val.prop, axis=-1) == pid
         nval = np.expand_dims(val[:, ~mask, :], axis=2)

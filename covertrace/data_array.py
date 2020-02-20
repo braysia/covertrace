@@ -53,7 +53,7 @@ class DataArray(LabeledArray):
     def load(cls, file_name):
         if not file_name.endswith('.npz'):
             file_name = file_name + '.npz'
-        f = np.load(file_name)
+        f = np.load(file_name, allow_pickle=True)
         arr, labels = f['arr'], f['labels']
         la = DataArray(arr, labels)
         for key, value in f.iteritems():

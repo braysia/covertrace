@@ -1,9 +1,9 @@
 import numpy as np
 import json
-from utils.upeak.data_processing import load_data, pad_traces, _normalize
-from utils.upeak.model_generator import model_generator
-from utils.upeak.upeak_settings import NORM_FUNCS, NORM_OPTIONS, NORM_METHOD
-from utils.upeak.upeak_settings import PAD_MODE, PAD_CV
+from data_processing import load_data, pad_traces, _normalize
+from model_generator import model_generator
+from upeak_settings import NORM_FUNCS, NORM_OPTIONS, NORM_METHOD
+from upeak_settings import PAD_MODE, PAD_CV
 
 def predict_peaks(traces, model=None, weights=None, normalize=False):
     

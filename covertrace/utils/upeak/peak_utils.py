@@ -170,7 +170,7 @@ class Peaks(OrderedDict):
         can be used to save arbitrary info in the Peaks class
         for example, to save an attribute before deleting it
         '''
-        for key in self.keys()
+        for key in self.keys():
             setattr(self[key], attr_name, attr_value)
 
     def get_attr(self, attr_name):

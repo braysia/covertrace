@@ -1,15 +1,16 @@
 import numpy as np
-from data_utils import _peak_asymmetry, _peak_amplitude, _peak_prominence
+from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence
 import scipy.stats as stats
 
-def clean_peaks(trace, labels, seeds, length_thres=None, assym_thres=None, linear_thres=None, amplitude_thres=None, prominence_thres=None):
+def clean_peaks(traces, labels, seeds, length_thres=None, assym_thres=None, linear_thres=None, amplitude_thres=None, prominence_thres=None):
     '''
-    This should be set up to take in a 2D matrix.
+    This uses a 2D matrix of traces (cells x timepoints)
+    labels and seeds must match dimensions
     '''
 
-    #messy af - should think of a better way to do this, maybe a decorator
+    #messy - should think of a better way to do this, maybe a decorator
     args = locals()
-    del args['trace']
+    del args['traces']
     del args['labels']
     del args['seeds']
     func_dict = {'length_thres':_filter_peaks_by_length, 'assym_thres':_filter_peaks_by_assymmetry, 'linear_thres':_filter_peaks_by_linreg, 'amplitude_thres':_filter_peaks_by_amplitude, 'prominence_thres': _filter_peaks_by_prominence}
@@ -19,17 +20,23 @@ def clean_peaks(trace, labels, seeds, length_thres=None, assym_thres=None, linea
     cleaned_seeds = seeds.copy()
     for n, t in enumerate(traces):
         l = labels[n]
+        s = seeds[n]
 
         if np.sum(l) > 0:  
             for func, param in cleaning_functions:
-                l = func(t, l, param)
+                if param == True:
+                    # uses default specified in the function
+                    l = func(t, l, s)
+                else:
+                    # use the value the user supplied
+                    l = func(t, l, s, param)
 
         cleaned_labels[n] = l
         cleaned_seeds[n] = np.where(seeds[n]==l, seeds[n], 0)
 
     return cleaned_labels, cleaned_seeds
 
-def _filter_peaks_by_length(trace, labels, min_length=8):
+def _filter_peaks_by_length(trace, labels, seeds, min_length=8):
     #trace is a dummy variable to keep things consistent
     peaks, counts = np.unique(labels, return_counts=True)
     
@@ -38,10 +45,10 @@ def _filter_peaks_by_length(trace, labels, min_length=8):
             labels = np.where(labels != p, labels, 0)
     return labels
 
-def _filter_peaks_by_linreg(trace, labels, thres=0.8):
+def _filter_peaks_by_linreg(trace, labels, seeds, thres=0.8):
     '''
     will do a linear regression with the points that are part of the peak
-    returns labels that passed the test
+    returns labels that have r^2 less than thres
     '''
     peaks = np.unique(labels)
     for n, p in enumerate(peaks):
@@ -54,7 +61,7 @@ def _filter_peaks_by_linreg(trace, labels, thres=0.8):
                 labels = np.where(labels != p, labels, 0)
     return labels
 
-def _filter_peaks_by_assymmetry(trace, labels, thres=0.1):
+def _filter_peaks_by_assymmetry(trace, labels, seeds, thres=0.1):
     '''
     Should remove peaks based on relative position of peaks to base
     Alternatively, could be done with height of amplitdue relative to ending height of peak
@@ -65,13 +72,15 @@ def _filter_peaks_by_assymmetry(trace, labels, thres=0.1):
     for n, p in enumerate(peaks):
         if p > 0:
             peak_idx = np.where(labels==p)[0]
-            assym = _peak_asymmetry(trace, peak_idx)
-            
+            plateau_idx = np.where(seeds==p)[0]
+
+            assym = _peak_asymmetry_by_plateau(trace, peak_idx, plateau_idx)
+
             if abs(1-assym) <= thres:
                 labels = np.where(labels != p, labels, 0)
     return labels
 
-def _filter_peaks_by_amplitude(trace, labels, thres=1.5):
+def _filter_peaks_by_amplitude(trace, labels, seeds, thres=1.5):
     '''
     remove all peaks where the max value does not reach thres
     '''
@@ -85,9 +94,11 @@ def _filter_peaks_by_amplitude(trace, labels, thres=1.5):
                 labels = np.where(labels != p, labels, 0)
     return labels
 
-def _filter_peaks_by_prominence(trace, labels, thres=0.5):
+def _filter_peaks_by_prominence(trace, labels, seeds, thres=0.5):
     '''
     remove all peaks that have prominence less than thres
+
+    NOT FINISHED
     '''
     peaks = np.unique(labels)
     for n, p in enumerate(peaks):
@@ -99,8 +110,8 @@ def _filter_peaks_by_prominence(trace, labels, thres=0.5):
                 labels = np.where(labels != p, labels, 0)
     return labels
 
-def _renumber_labels(labels):
+def _filter_peaks_by_height_asymmetry(trace, labels, seeds, thres=0.2):
     '''
-    not sure that this is needed
+    TODO right function that will remove a peak if one end of the base is to close to the amplitude in terms of height
     '''
     pass

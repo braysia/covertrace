@@ -12,6 +12,10 @@ def predict_peaks(traces, model=None, weights=None, normalize=False):
 
     result = model.predict(traces)
     return result[:, :orig_length, :]
+
+def initialize_model(traces, model, weights, normalize=False):
+    # would be nice to keep model object for speed up
+    pass
     
 def _parse_inputs_to_expected(traces, model, weights, normalize):
     # model should be option_dict loaded from json file - parse path to loaded dictionary
@@ -19,7 +23,7 @@ def _parse_inputs_to_expected(traces, model, weights, normalize):
 
     if model is None:
         # set default model parameters
-        model_dict = {'dims': (64, 1), 'classes': 3, 'steps': 3, 'layers': 2, 'filters': 32, 'kernel_size': 8, 
+        model_dict = {'dims': (64, 1), 'classes': 3, 'steps': 3, 'layers': 2, 'filters': 32, 'kernel': 8, 
             'stride': 1, 'transfer': True, 'activation': 'relu', 'padding': 'same'}
     elif type(model) == str:
         with open(model, 'r') as json_file:
@@ -36,14 +40,44 @@ def _parse_inputs_to_expected(traces, model, weights, normalize):
     traces = pad_traces(traces, model_depth, pad_mode=PAD_MODE, cv=PAD_CV)
 
     input_dims = (traces.shape[1], traces.shape[2], model_dict['classes'])
+    
     model = model_generator(input_dims=input_dims, steps=model_dict['steps'], conv_layers=model_dict['layers'],
         filters=model_dict['filters'], kernel_size=model_dict['kernel'], strides=model_dict['stride'],
         transfer=model_dict['transfer'], activation=model_dict['activation'], padding=model_dict['padding'])
 
+    # for layer in model.layers:
+    #     layer.trainable = False
+
     if weights is None:
-        #this should load some sort of default weight that goes with the default model
+        #this should have a path to default weights that can be used with a default model structure
         pass
-    else:
-        model.load_weights(weights)
+    
+    model = _custom_load_weights(model, weights)
     
     return traces, model
+
+def _custom_load_weights(model, weights):
+    try:
+        model.load_weights(weights)
+    except Exception:
+        import h5py
+        with h5py.File(weights, 'r') as f:
+            for layer in model.layers:
+                key = layer.name
+
+                for key2 in f[key].keys():
+                    groups = [key3 for key3 in f[key][key2].keys()]
+
+                    #this should be based on layer, not on presence of keys
+                    #not sure if this will work with any layers outside the upeak options
+                    if 'gamma:0' in groups:
+                        order = ['gamma:0', 'beta:0', 'moving_mean:0', 'moving_variance:0']
+                    elif 'kernel:0' in groups:
+                        order = ['kernel:0', 'bias:0']
+                    else:
+                        raise ValueError('Groups {0} in weights not understood'.format(str(groups)))
+
+                    w = [f[key][key2][g][:] for g in order]
+                    layer.set_weights(w)
+    return model
+

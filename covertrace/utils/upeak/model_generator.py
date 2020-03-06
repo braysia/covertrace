@@ -101,6 +101,6 @@ def upsampling_module(layer, steps, transfer_layers=None, filters=8, kernel_size
         layer = conv_layer_module(layer, steps=steps[1], filters=int(filters), kernel_size=kk, strides=strides, activation=activation, padding=padding)
         stack.append(layer)
 
-        filters *= 0.5
+        filters = int(filters) * 0.5
 
     return stack

@@ -43,6 +43,9 @@ class Peaks(OrderedDict):
     def traces(self):
         return [self[key].traces for key in self.keys()]
 
+    def peak_counts(self):
+        return [self[key].peak_counts for key in self.keys()]
+
     def normalize_traces(self, method='base'):
         '''
         keyword args:
@@ -192,6 +195,7 @@ class peak_site():
         self._plateau_idxs = _labels_to_peak_idxs(self.seed_labels)
         self._peak_masks = _labels_to_mask(self.peak_labels)
         self._plateau_masks = _labels_to_mask(self.seed_labels)
+        self.peak_counts = [len(p) for p in self._peak_idxs]
 
     def _clear_attr(self, attr):
         if hasattr(self, attr):
@@ -287,11 +291,10 @@ class peak_site():
 
             if adjust_tracts:
                 if not hasattr(self, 'tracts'):
-                    self.tracts = []
-                    for n in range(0, self.traces.shape[0]):
-                        self.tracts.append(_detect_peak_tracts(self.traces[n], self.peak_labels[n]))
-                        self.prominence.append(du._tract_adjusted_peak_prominence(self.traces[n], self.peak_labels[n], self.tracts[n],
-                            self.base[n], self.amplitude[n], self.base_pts[n], bi_directional))
+                    self._get_tracts(max_gap=max_gap)
+                for n in range(0, self.traces.shape[0]):
+                    self.prominence.append(du._tract_adjusted_peak_prominence(self.traces[n], self.peak_labels[n], self.tracts[n],
+                        self.base[n], self.amplitude[n], self.base_pts[n], bi_directional))
 
             else:
                 for n in range(0, self.traces.shape[0]):

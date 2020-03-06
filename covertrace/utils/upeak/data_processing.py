@@ -44,7 +44,10 @@ def load_data(traces):
     Loads data. Makes traces correct dimension (3D) and converts labels to categorical
     traces of different lengths are padded.
     '''
-    traces = stack_sequences([nan_helper_2d(np.load(t)) for t in traces], cv=np.nan)
+    if type(traces) == np.ndarray:
+        traces = nan_helper_2d(traces)
+    else:
+        traces = stack_sequences([nan_helper_2d(np.load(t)) for t in traces], cv=np.nan)
     traces = np.expand_dims(traces, axis=-1)
 
     return traces
@@ -84,7 +87,7 @@ def normalize_zscore(traces, by_row=True, offset=0, normalize=False):
     '''
     
     def z_func(a, offset=offset):
-        return stats.zscore(a, nan_policy='omit') + offset
+        return stats.zscore(a) + offset
 
     if by_row:
         arr = np.apply_along_axis(z_func, 1, traces) # (function, axis, array)
@@ -127,7 +130,7 @@ def _normalize(funcs, options, method, arr):
     '''
     '''
     assert len(funcs) == len(method), 'Functions and methods must be same length'
-    func_dict = {'zscore' : normalize_zscore, 'amplitude' : normalize_amplitude, 'maxabs' : normalize_maxabs, 'norm' : normalize_by_norm}
+    func_dict = {'zscore' : normalize_zscore, 'amplitude' : normalize_amplitude, 'maxabs' : normalize_maxabs}
     to_run = [func_dict[f] for f in funcs]
     
     while len(to_run) > len(options):

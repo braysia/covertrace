@@ -2,6 +2,7 @@ import numpy as np
 import math
 from peakutils import baseline
 from scipy.integrate import simps
+from data_processing import nan_helper
 
 def normalize_by_baseline(trace, deg=1):
     '''
@@ -9,8 +10,29 @@ def normalize_by_baseline(trace, deg=1):
     Normalize trace by the mean of that baseline
     Returns fold activation over baseline
     '''
+    if np.isnan(trace).any():
+        nans, z = nan_helper(trace)
+        trace[nans] = np.interp(z(nans), z(~nans), trace[~nans])
+        
     base = baseline(trace, deg=deg)
     return trace / np.mean(base)
+
+def _detect_peak_tracts(trace, labels, max_gap=12):
+    '''
+    this would be faster if I re-wrote it to use peak_idx instead of labels
+    should return peak values in tract
+    tracts are individual arrays in list of tracts returned
+    '''
+    if np.sum(labels) > 0:
+        peak_idxs = np.where(labels>0)[0]
+        labels_no_zeros = np.array([labels[p] for p in peak_idxs])
+        diffs = np.ediff1d(peak_idxs, to_begin=1)
+        bounds = np.where(diffs > max_gap)[0]
+        tracts = [np.unique(t) for t in np.split(labels_no_zeros, bounds)]
+    else:
+        tracts = []
+        
+    return tracts
 
 def _peak_base_pts(trace, peak_idx, adjust_edge=True, dist=4):
     '''
@@ -109,7 +131,7 @@ def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None, peak
                 if peak_amplitudes is not None:
                     peak_amp = peak_amplitudes[peak_num]
                 else:
-                    _, peak_amp = _peak_amplitude(trace, peak_idx)
+                    peak_amp = _peak_amplitude(trace, peak_idx)
                 
                 if not bi_directional:
                     if peak_base_pts is not None:
@@ -125,7 +147,19 @@ def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None, peak
                 prominences.append(_peak_prominence(trace, peak_idx, peak_base=base, peak_amp=peak_amp))
         else:
             peak_idx = np.where(labels==t[0])[0]
-            prominences.append(_peak_prominence(trace, peak_idx, peak_base=peak_bases[n], peak_amp=peak_amplitudes[n]))
+            i = flat_tracts.index(t[0])
+
+            if peak_bases is not None:
+                base = peak_bases[i]
+            else:
+                base = _peak_base(trace, peak_idx)
+
+            if peak_amplitudes is not None:
+                peak_amp = peak_amplitudes[i]
+            else:
+                peak_amp = _peak_amplitude(trace, peak_idx)
+
+            prominences.append(_peak_prominence(trace, peak_idx, peak_base=base, peak_amp=peak_amp))
     
     return prominences
 
@@ -191,6 +225,9 @@ def _peak_prominence(trace, peak_idx, peak_base=None, peak_amp=None):
     return amp - base_height, base_height
 
 def _time_above_thres(trace, peak_idx, rel_thres=0.5, prominence=None, abs_thres=None):
+    '''
+    returns number of data points that trace was above thres
+    '''
     
     mask = np.zeros_like(trace, dtype=bool)
     mask[peak_idx] = True
@@ -211,7 +248,17 @@ def _time_above_thres(trace, peak_idx, rel_thres=0.5, prominence=None, abs_thres
 def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None, 
         tracts=None, estimate='linear', return_widest=True, amplitude=None, prominence=None, slope_pts=None):
     '''
+    any nans present in trace are linearly interpolated to avoid nans in final results
     '''
+
+    mask = np.zeros_like(trace, dtype=bool)
+    mask[peak_idx] = True
+    pv = np.where(mask==True, trace, 0)
+
+    if np.isnan(trace).any():
+        nans, z = nan_helper(trace)
+        trace[nans] = np.interp(z(nans), z(~nans), trace[~nans])
+
     if (estimate == 'linear') and (slope_pts is None):
         raise ValueError('Slope pts must be provided if using linear estimation of peak width')
     elif (estimate == 'gauss') and (tracts is None):
@@ -232,6 +279,10 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         target_height = (prominence * rel_height) + base
     else:
         target_height = abs_height
+
+    if target_height > np.max(pv):
+        #height above peak, should return nans so that width becomes nan
+        return [(np.nan, np.nan), (np.nan, np.nan)]
     
     all_cross_pts = np.where(np.diff(np.sign(trace - target_height)))[0]
     peak_cross_pts = np.array([a for a in all_cross_pts if a in peak_idx])
@@ -251,7 +302,7 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         else:
             crosses = (crosses[first_up_cross], crosses[first_down_cross])
 
-    except Exception:
+    except IndexError: # really dirty - I should figure out exactly which exceptions might get called 
         # this means that it couldn't find one up and one down cross for each
         # the crosses will have to be recalculated. 
         if estimate == 'gauss':
@@ -282,10 +333,14 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
 
         elif estimate == 'base':
             crosses = (peak_idx[0], peak_idx[-1])
+        elif (estimate == None) or (estimate == 'None'):
+            # values are below peak, and user decides not to estimate. Width is nan
+            return [(np.nan, np.nan), (np.nan, np.nan)]
         else:
             raise ValueError('Estimate must be one of gauss, linear, or base.')
 
-    return list(zip(crosses, [target_height for c in crosses]))
+    if len(list(zip(crosses, [target_height for c in crosses]))) >= 1: ## CHECK: should this len == 1 always?
+        return list(zip(crosses, [target_height for c in crosses]))
 
 def _width_at_pts(test_pts):
     return [t[-1][0] - t[0][0] for t in test_pts]

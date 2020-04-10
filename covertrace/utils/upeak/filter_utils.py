@@ -1,5 +1,5 @@
 import numpy as np
-from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence
+from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence, _detect_peak_tracts
 import scipy.stats as stats
 
 def clean_peaks(traces, labels, seeds, length_thres=None, assym_thres=None, linear_thres=None, amplitude_thres=None, prominence_thres=None):
@@ -96,17 +96,17 @@ def _filter_peaks_by_amplitude(trace, labels, seeds, thres=1.5):
 
 def _filter_peaks_by_prominence(trace, labels, seeds, thres=0.5):
     '''
-    remove all peaks that have prominence less than thres
-
-    NOT FINISHED
+    Values are calculated using defaults. It's possible user would have specified different parameters.
+    The only way to include those would be to include these functions as part of the Peak class.
+    May be something useful to do in future. Would allow filtering after paramaterization.
     '''
     peaks = np.unique(labels)
-    for n, p in enumerate(peaks):
+    tracts = _detect_peak_tracts(trace, labels)
+    prominences = _tract_adjusted_peak_prominence(trace, labels, tracts)
+
+    for n, p in enumerate(peaks): #could loop over tracts too.
         if p > 0:
-            peak_idx = np.where(labels==p)[0]
-            amp_location, amp = _peak_amplitude(trace, peak_idx)
-            
-            if amp < thres:
+            if prominences[n-1][0] < thres:
                 labels = np.where(labels != p, labels, 0)
     return labels
 

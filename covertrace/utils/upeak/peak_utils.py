@@ -41,28 +41,55 @@ class Peaks(OrderedDict):
             self[key]._interp_nans()
 
     def traces(self):
+        '''
+        Returns value of traces used for calculating all peak_attributes.
+        If normalize_traces has been called, these traces are normalized.
+        Otherwise. traces are input traces and self.traces = self.raw_traces
+        '''
         return [self[key].traces for key in self.keys()]
 
+    def raw_traces(self):
+        '''
+        Returns original traces that were provided when Peaks class was made.
+        '''
+        return [self[key].raw_traces for key in self.keys()]
+
     def peak_counts(self):
+        '''
+
+        '''
         return [self[key].peak_counts for key in self.keys()]
 
     def normalize_traces(self, method='base'):
         '''
+        Normalizes traces using method provided. 
+        Initial traces are saved in self.raw_traces and remain unchanged. Normalized traces are in self.traces
+        If nans were present in traces, those are interpolated
+
         keyword args:
         method - currently only option is base. Calculates linear base of each trace and normalizes values to the mean of the baseline
 
-        TODO: add more normalization options
+        TODO: add more normalization options. potentially something like flatten, which subtracts the baseline?
         '''
         for key in self.keys():
             self[key]._normalize_traces(method=method)
         
     def amplitude(self):
+        '''
+        Returns: tuple of (x, y) of the highest point in the peak
+        '''
         for key in self.keys():
             self[key]._get_amplitude()
         return [self[key].amplitude for key in self.keys()]
             
     def base(self, adjust_edge=True, dist=4):
         '''
+        Finds base of peak.
+
+        Returns: tuple of (y0, y1, theta), where y0/y1 are the height at the edge of the base, and theta is the angle
+        The (x, y) points can be found by calling base_pts
+
+        keyword_arguments:
         adjust_edge will make the base flat for peaks that extend to the edge of the trace.
         dist is the distance from the edge that this adjustment will apply
         '''
@@ -72,6 +99,11 @@ class Peaks(OrderedDict):
 
     def asymmetry(self, method='plateau'):
         '''
+        Rough calculation of assymmetry of peak.
+
+        Returns: value [0, 1] of where the point is on the whole length of the peak. 0.5 is perfectly symmetrical
+
+        keyword arguments:
         plateau method: finds middle of peak plateau and measures asymmetry from there
         amplitude method: finds point of highest amplitude and measures asymmetry from there
         '''
@@ -81,6 +113,8 @@ class Peaks(OrderedDict):
 
     def base_pts(self, adjust_edge=True, dist=4):
         '''
+        Returns: [(x1, y1), (x2, y2)] for the two points at the edge of the base of the peak.
+
         adjust_edge will make the base flat for peaks that extend to the edge of the trace.
         dist is the distance from the edge that this adjustment will apply
         '''
@@ -90,21 +124,30 @@ class Peaks(OrderedDict):
 
     def prominence(self, adjust_tracts=True, bi_directional=False, max_gap=12):
         '''
+        Returns: tuple of (prominence above base_height, base_height)
         prominence is defined in this case as the height of the peak above the base of the peak
-        if adjust_tracts is true, the base will be defined as the base of a tract of peaks
-        if bi_directional is true, the base can be made higher or lower based on tracts, if false, only can be lower
-        max_gap is the distance between peaks used for detecting tracts
+
+        keyword arguments:
+        adjust_tracts: if True, the base will be defined as the base of a tract of peaks
+        bi_directional: if True, the base can be made higher or lower based on tracts, if false, only can be lower
+        max_gap: the distance between peaks used for detecting tracts. (only used if adjust_tracts is True)
         '''
         for key in self.keys():
             self[key]._get_prominence(adjust_tracts=adjust_tracts, bi_directional=bi_directional, max_gap=max_gap)
         return [self[key].prominence for key in self.keys()]
 
     def peak_area_under_curve(self):
+        '''
+        Calculate area under the curve for each peak
+        '''
         for key in self.keys():
             self[key]._get_auc(area='peak')
         return [self[key].peak_auc for key in self.keys()]
 
     def total_area_under_curve(self):
+        '''
+        Calculate total area under the curve
+        '''
         for key in self.keys():
             self[key]._get_auc(area='total')
         return [self[key].total_auc for key in self.keys()]
@@ -189,6 +232,7 @@ class Peaks(OrderedDict):
 class peak_site():
     def __init__(self, traces, peak_labels, seed_labels):
         self.traces = np.array(traces)
+        self.raw_traces = np.array(traces)
         self.peak_labels = np.array(peak_labels)
         self.seed_labels = np.array(seed_labels)
         self._peak_idxs = _labels_to_peak_idxs(self.peak_labels)
@@ -271,7 +315,7 @@ class peak_site():
         if not hasattr(self, 'tracts'):
             self.tracts = []
             for n in range(0, self.traces.shape[0]):
-                self.tracts.append(_detect_peak_tracts(self.traces[n], self.peak_labels[n], max_gap=max_gap))
+                self.tracts.append(du._detect_peak_tracts(self.traces[n], self.peak_labels[n], max_gap=max_gap))
 
         return self.tracts
 
@@ -370,7 +414,11 @@ class peak_site():
         return self.slope_pts
 
     def _get_gaussians(self):
-        # TODO: Need to figure out how to estimate gaussian mixture
+        '''
+        Currently not implemented
+        TODO: Need to figure out how to estimate gaussian mixture
+        '''
+
         if not hasattr(self, 'gaussians'):
             if not hasattr(self, 'tracts'):
                 self._get_tracts()
@@ -383,6 +431,7 @@ class peak_site():
         self.traces = nan_helper_2d(self.traces)
 
     def _normalize_traces(self, method):
+
         if method == 'base':
             for n in range(0, self.traces.shape[0]):
                 self.traces[n] = du.normalize_by_baseline(self.traces[n])
@@ -451,23 +500,6 @@ def _agglom_watershed_peak_finder(trace, seeds, total_prob, steps=50, min_peak_p
             seeds = watershed(trace, markers=seeds, mask=cand_mask, watershed_line=True, compactness=5)
         
     return seeds
-
-def _detect_peak_tracts(trace, labels, max_gap=12):
-    '''
-    this would be faster if I re-wrote it to use peak_idx instead of labels
-    should return peak values in tract
-    tracts are individual arrays in list of tracts returned
-    '''
-    if np.sum(labels) > 0:
-        peak_idxs = np.where(labels>0)[0]
-        labels_no_zeros = np.array([labels[p] for p in peak_idxs])
-        diffs = np.ediff1d(peak_idxs, to_begin=1)
-        bounds = np.where(diffs > max_gap)[0]
-        tracts = [np.unique(t) for t in np.split(labels_no_zeros, bounds)]
-    else:
-        tracts = []
-        
-    return tracts
 
 def _idxs_to_labels(trace, seed_idxs):
     labels = np.zeros(trace.shape)

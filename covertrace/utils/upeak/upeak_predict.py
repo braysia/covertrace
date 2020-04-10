@@ -23,8 +23,8 @@ def _parse_inputs_to_expected(traces, model, weights, normalize):
 
     if model is None:
         # set default model parameters
-        model_dict = {'dims': (64, 1), 'classes': 3, 'steps': 3, 'layers': 2, 'filters': 32, 'kernel': 8, 
-            'stride': 1, 'transfer': True, 'activation': 'relu', 'padding': 'same'}
+        model_dict = {'dims': (64, 1), 'classes': 3, 'steps': 2, 'layers': 2, 'filters': 64, 'kernel': 4, 
+            'stride': 1, 'transfer': False, 'activation': 'LeakyReLU', 'padding': 'same'}
     elif type(model) == str:
         with open(model, 'r') as json_file:
             model_dict = json.load(json_file)
@@ -36,6 +36,7 @@ def _parse_inputs_to_expected(traces, model, weights, normalize):
     traces = load_data(traces)
     if normalize:
         traces = _normalize(NORM_FUNCS, NORM_OPTIONS, NORM_METHOD, traces)
+
     model_depth = model_dict['steps']
     traces = pad_traces(traces, model_depth, pad_mode=PAD_MODE, cv=PAD_CV)
 
@@ -44,9 +45,6 @@ def _parse_inputs_to_expected(traces, model, weights, normalize):
     model = model_generator(input_dims=input_dims, steps=model_dict['steps'], conv_layers=model_dict['layers'],
         filters=model_dict['filters'], kernel_size=model_dict['kernel'], strides=model_dict['stride'],
         transfer=model_dict['transfer'], activation=model_dict['activation'], padding=model_dict['padding'])
-
-    # for layer in model.layers:
-    #     layer.trainable = False
 
     if weights is None:
         #this should have a path to default weights that can be used with a default model structure

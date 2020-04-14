@@ -2,7 +2,7 @@ import keras
 from keras.layers import Conv1D, MaxPooling1D, UpSampling1D, BatchNormalization, Input, Activation
 from keras.layers.advanced_activations import LeakyReLU
 from keras import backend as K
-from _setting import ALPHA
+from upeak_settings import ALPHA
 
 def model_generator(input_dims=(64, 1, 3), steps=2, conv_layers=2, transfer=False, filters=64, kernel_size=4, strides=1, activation='LeakyReLU', padding='same'):
     '''

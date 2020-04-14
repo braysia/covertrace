@@ -1,5 +1,5 @@
 import numpy as np
-from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence, _detect_peak_tracts
+from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence, _detect_peak_tracts, _tract_adjusted_peak_prominence
 import scipy.stats as stats
 
 def clean_peaks(traces, labels, seeds, length_thres=None, assym_thres=None, linear_thres=None, amplitude_thres=None, prominence_thres=None):

@@ -7,9 +7,9 @@ def nan_helper(y):
 
 def nan_helper_2d(arr):
     #probably can be done faster
-    temp = np.empty(arr.shape)
+    temp = np.zeros(arr.shape)
     temp[:] = np.nan
-    for n, y in enumerate(arr):
+    for n, y in enumerate(arr.copy()):
         nans, z = nan_helper(y)
         y[nans] = np.interp(z(nans), z(~nans), y[~nans])
         temp[n, :] = y 

@@ -340,6 +340,8 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         else:
             raise ValueError('Estimate must be one of gauss, linear, or base.')
 
+    crosses = [c if c > 0 else np.nan for c in crosses]
+
     if len(list(zip(crosses, [target_height for c in crosses]))) >= 1: ## CHECK: should this len == 1 always?
         return list(zip(crosses, [target_height for c in crosses]))
 

@@ -1,8 +1,8 @@
 import numpy as np
-from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence, _detect_peak_tracts, _tract_adjusted_peak_prominence
+from data_utils import _peak_asymmetry_by_plateau, _peak_amplitude, _peak_prominence, _detect_peak_tracts, _tract_adjusted_peak_prominence, _peak_base
 import scipy.stats as stats
 
-def clean_peaks(traces, labels, seeds, length_thres=None, assym_thres=None, linear_thres=None, amplitude_thres=None, prominence_thres=None):
+def clean_peaks(traces, labels, seeds, length_thres=None, assym_thres=None, linear_thres=None, amp_thres=None, prom_thres=None, height_assym_thres=None):
     '''
     This uses a 2D matrix of traces (cells x timepoints)
     labels and seeds must match dimensions
@@ -13,7 +13,9 @@ def clean_peaks(traces, labels, seeds, length_thres=None, assym_thres=None, line
     del args['traces']
     del args['labels']
     del args['seeds']
-    func_dict = {'length_thres':_filter_peaks_by_length, 'assym_thres':_filter_peaks_by_assymmetry, 'linear_thres':_filter_peaks_by_linreg, 'amplitude_thres':_filter_peaks_by_amplitude, 'prominence_thres': _filter_peaks_by_prominence}
+    func_dict = {'length_thres':_filter_peaks_by_length, 'assym_thres':_filter_peaks_by_assymmetry, 
+        'linear_thres':_filter_peaks_by_linreg, 'amp_thres':_filter_peaks_by_amplitude, 
+        'prom_thres': _filter_peaks_by_prominence, 'height_assym_thres':_filter_peaks_by_height_asymmetry}
     cleaning_functions = [(func_dict[a], v) for a, v in args.items() if v is not None]
     
     cleaned_labels = labels.copy()
@@ -110,8 +112,19 @@ def _filter_peaks_by_prominence(trace, labels, seeds, thres=0.5):
                 labels = np.where(labels != p, labels, 0)
     return labels
 
-def _filter_peaks_by_height_asymmetry(trace, labels, seeds, thres=0.2):
+def _filter_peaks_by_height_asymmetry(trace, labels, seeds, thres=0.85):
     '''
-    TODO right function that will remove a peak if one end of the base is to close to the amplitude in terms of height
+    Values are calculated using defaults, intentionally not adjusting for base location
+    Thres is what fraction of the amplitude the base_height would have to be to remove
     '''
-    pass
+    peaks = np.unique(labels)
+    for n, p in enumerate(peaks):
+        if p > 0:
+            peak_idx = np.where(labels==p)[0]
+
+            left_base, right_base, theta = _peak_base(trace, peak_idx)
+            amp_location, amp_height = _peak_amplitude(trace, peak_idx)
+
+            if (left_base / amp_height >= thres) or (right_base / amp_height >= thres):
+                labels = np.where(labels != p, labels, 0)
+    return labels

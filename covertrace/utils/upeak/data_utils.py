@@ -10,11 +10,12 @@ def normalize_by_baseline(trace, deg=1):
     Normalize trace by the mean of that baseline
     Returns fold activation over baseline
     '''
-    if np.isnan(trace).any():
-        nans, z = nan_helper(trace)
-        trace[nans] = np.interp(z(nans), z(~nans), trace[~nans])
+    trace_copy = np.array(trace)
+    if np.isnan(trace_copy).any():
+        nans, z = nan_helper(trace_copy)
+        trace_copy[nans] = np.interp(z(nans), z(~nans), trace[~nans])
         
-    base = baseline(trace, deg=deg)
+    base = baseline(trace_copy, deg=deg)
     return trace / np.mean(base)
 
 def _detect_peak_tracts(trace, labels, max_gap=12):
@@ -84,6 +85,7 @@ def _adjust_edge_base_height(trace, base_pts, dist=4):
     '''
     base_pts should be list or tuple of two points at the base: [(x1, y1), (x2, y2)]
     will return new points with y1 or y2 adjusted. (shouldn't ever be both)
+    Only adjusts base height down, not up.
     '''
     left_height = base_pts[0][1]
     right_height = base_pts[1][1]
@@ -91,9 +93,9 @@ def _adjust_edge_base_height(trace, base_pts, dist=4):
     left_edge = 0
     right_edge = len(trace) - 1 #because of 0 indexing
 
-    if abs(base_pts[0][0] - left_edge) <= dist:
+    if (abs(base_pts[0][0] - left_edge) <= dist) and (right_height < left_height):
         left_height = right_height
-    elif abs(base_pts[1][0] - right_edge) <= dist:
+    elif (abs(base_pts[1][0] - right_edge) <= dist) and (left_height < right_height):
         right_height = left_height
         
     return (base_pts[0][0], left_height), (base_pts[1][0], right_height)
@@ -178,7 +180,6 @@ def _peak_asymmetry_by_plateau(trace, peak_idx, plateau_idx):
     '''
     measures asymmetry from the center of the plateau
     '''
-
     plateau_left, plateau_right = _plateau_pts(trace, plateau_idx)
     plateau_mid = (plateau_left[0] + plateau_right[0]) / 2
 

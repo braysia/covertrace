@@ -96,7 +96,7 @@ class Peaks(OrderedDict):
 
     def peak_counts(self):
         '''
-
+        Returns number of detected peaks for each site
         '''
         return [self[key].peak_counts for key in self.keys()]
 
@@ -280,7 +280,7 @@ class peak_site():
         self._plateau_idxs = _labels_to_peak_idxs(self.seed_labels)
         self._peak_masks = _labels_to_mask(self.peak_labels)
         self._plateau_masks = _labels_to_mask(self.seed_labels)
-        self.peak_counts = [len(p) for p in self._peak_idxs]
+        self.peak_counts = np.array([len(p) for p in self._peak_idxs])
 
     def _clear_attr(self, attr):
         if hasattr(self, attr):

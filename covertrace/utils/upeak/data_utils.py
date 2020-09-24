@@ -100,7 +100,8 @@ def _adjust_edge_base_height(trace, base_pts, dist=4):
         
     return (base_pts[0][0], left_height), (base_pts[1][0], right_height)
 
-def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None, peak_amplitudes=None, peak_base_pts=None, bi_directional=False):
+def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None, 
+        peak_amplitudes=None, peak_base_pts=None, bi_directional=False):
     '''
     if bidirectional is True, base can be raised or lowered
     if bidirectional is False, base can only be lowered. i.e. use the original peak base if it is lower
@@ -344,6 +345,16 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
 
     if len(list(zip(crosses, [target_height for c in crosses]))) >= 1: ## CHECK: should this len == 1 always?
         return list(zip(crosses, [target_height for c in crosses]))
+
+def _integrated_activity(trace):
+    '''
+    Returns integrated activity of the whole trace
+    '''
+    temp = np.zeros(trace.shape)
+    return np.array([np.sum(base[:i+1]) for i in np.arange(0, len(base))])
+
+def _derivative_trace(trace):
+    return np.ediff1d(trace, to_begin=0)
 
 def _width_at_pts(test_pts):
     return [t[-1][0] - t[0][0] for t in test_pts]

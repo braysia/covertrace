@@ -200,6 +200,22 @@ class Peaks(OrderedDict):
             self[key]._get_auc(area='total')
         return [self[key].total_auc for key in self.keys()]
 
+    def integral(self):
+        '''
+        Returns integrated activity over time
+        '''
+        for key in self.keys():
+            self[key]._get_integral()
+        return [self[key].integral for key in self.keys()]
+
+    def derivative(self):
+        '''
+        Returns derivative of the trace at each point
+        '''
+        for key in self.keys():
+            self[key]._get_derivative()
+        return [self[key].derivative for key in self.keys()]
+
     def width(self, rel_height=0.5, abs_height=None, estimate='linear', return_widest=True, duplicates=True):
         '''
         rel_height is the height relative to the PROMINENCE of the peak at which to measure width
@@ -414,6 +430,25 @@ class peak_site():
                     self.base.append([du._peak_base(self.traces[n], p, bp) for (p, bp) in zip(self._dedup_peak_idxs[n], self.base_pts[n])])
             
         return self.base
+
+    def _get_integral(self):
+
+        if not hasattr(self, 'integral'):
+            self.integral = []
+            for n in range(self.traces.shape[0]):
+                self.integral.append(du._integrated_activity(self.traces[n]))
+
+        return self.integral
+
+    def _get_derivative(self):
+        # TODO: add functionality to specificy indices
+
+        if not hasattr(self, 'derivative'):
+            self.derivative = []
+            for n in range(self.traces.shape[0]):
+                self.derivative.append(du._derivative_trace(self.traces[n]))
+
+        return self.derivative
 
     def _get_tracts(self, max_gap=12, duplicates=True):
 

@@ -34,6 +34,8 @@ def remove_props_single_frame(site, pid=1):
         mask = np.max(val.prop, axis=-1) == pid
         nval = np.expand_dims(val[:, ~mask, :], axis=2)
         narr = DataArray(nval, val.labels)
+        if len(narr.shape) == 2:
+            narr = np.expand_dims(narr, axis=-1)
         narr._set_extra_attr(narr, val)
         site[key] = narr
     site._set_keys2attr()

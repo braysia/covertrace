@@ -10,7 +10,7 @@ def normalize_by_baseline(trace, deg=1):
     Normalize trace by the mean of that baseline
     Returns fold activation over baseline
     '''
-    trace_copy = np.array(trace)
+    trace_copy = np.copy(np.array(trace))
     if np.isnan(trace_copy).any():
         nans, z = nan_helper(trace_copy)
         trace_copy[nans] = np.interp(z(nans), z(~nans), trace[~nans])

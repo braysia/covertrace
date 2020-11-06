@@ -4,6 +4,7 @@ from peakutils import baseline
 from scipy.integrate import simps
 from data_processing import nan_helper
 
+
 def normalize_by_baseline(trace, deg=1):
     '''
     should estimate baseline of degree deg
@@ -14,9 +15,10 @@ def normalize_by_baseline(trace, deg=1):
     if np.isnan(trace_copy).any():
         nans, z = nan_helper(trace_copy)
         trace_copy[nans] = np.interp(z(nans), z(~nans), trace[~nans])
-        
+
     base = baseline(trace_copy, deg=deg)
     return trace / np.mean(base)
+
 
 def _detect_peak_tracts(trace, labels, max_gap=12):
     '''
@@ -32,8 +34,9 @@ def _detect_peak_tracts(trace, labels, max_gap=12):
         tracts = [np.unique(t) for t in np.split(labels_no_zeros, bounds)]
     else:
         tracts = []
-        
+
     return tracts
+
 
 def _peak_base_pts(trace, peak_idx, adjust_edge=True, dist=4):
     '''
@@ -44,12 +47,14 @@ def _peak_base_pts(trace, peak_idx, adjust_edge=True, dist=4):
         base_pts = _adjust_edge_base_height(trace, base_pts, dist=dist) #adjust base height for edges of traces
     return base_pts
 
+
 def _plateau_pts(trace, plateau_idx):
     '''
     seed should be determined using constant thres as with the watershed algorithm
     this will take those seeds and return the left and right points for each plateau in seed.
     '''
     return (plateau_idx[0], trace[plateau_idx[0]]), (plateau_idx[-1], trace[plateau_idx[-1]])
+
 
 def _slope_pts(trace, peak_idx, plateau_idx):
     '''
@@ -60,14 +65,18 @@ def _slope_pts(trace, peak_idx, plateau_idx):
     right_slope = (plateau_idx[-1], trace[plateau_idx[-1]]), (peak_idx[-1], trace[peak_idx[-1]])
     return left_slope, right_slope
 
+
 def _mean_diff(trace, idx):
     return np.mean(np.diff(trace[idx]))
+
 
 def _median_diff(trace, idx):
     return np.median(np.diff(trace[idx]))
 
+
 def _avg_slope(trace, idx):
     return (trace[idx[-1]] - trace[idx[0]]) / len(idx)
+
 
 def _peak_base(trace, peak_idx, base_pts=None):
     '''
@@ -81,6 +90,7 @@ def _peak_base(trace, peak_idx, base_pts=None):
     theta = math.degrees(math.atan2((y1 - y0), (x1 - x0)))
     return y0, y1, theta
 
+
 def _adjust_edge_base_height(trace, base_pts, dist=4):
     '''
     base_pts should be list or tuple of two points at the base: [(x1, y1), (x2, y2)]
@@ -89,7 +99,7 @@ def _adjust_edge_base_height(trace, base_pts, dist=4):
     '''
     left_height = base_pts[0][1]
     right_height = base_pts[1][1]
-    
+
     left_edge = 0
     right_edge = len(trace) - 1 #because of 0 indexing
 
@@ -97,11 +107,12 @@ def _adjust_edge_base_height(trace, base_pts, dist=4):
         left_height = right_height
     elif (abs(base_pts[1][0] - right_edge) <= dist) and (left_height < right_height):
         right_height = left_height
-        
+
     return (base_pts[0][0], left_height), (base_pts[1][0], right_height)
 
-def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None, 
-        peak_amplitudes=None, peak_base_pts=None, bi_directional=False):
+
+def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None,
+                                    peak_amplitudes=None, peak_base_pts=None, bi_directional=False):
     '''
     if bidirectional is True, base can be raised or lowered
     if bidirectional is False, base can only be lowered. i.e. use the original peak base if it is lower
@@ -121,31 +132,30 @@ def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None,
             else:
                 left_base = np.where(labels==t[0])[0][0]
                 right_base = np.where(labels==t[-1])[0][-1]
-                
+
                 left_height, right_height, _ = _peak_base(trace, [left_base, right_base])
-            
+
             tract_base_height = np.mean([left_height, right_height])
             base = (left_height, right_height)
-      
+
             for p in t:
                 peak_num = flat_tracts.index(p)
                 peak_idx = np.where(labels==p)[0]
-                
+
                 if peak_amplitudes is not None:
                     peak_amp = peak_amplitudes[peak_num]
                 else:
                     peak_amp = _peak_amplitude(trace, peak_idx)
-                
+
                 if not bi_directional:
                     if peak_base_pts is not None:
                         ((x1, y1), (x2, y2)) = peak_base_pts[peak_num]
                     else:
                         ((x1, y1), (x2, y2)) = _peak_base_pts(trace, peak_idx)
-                    
+
                     old_base = (y1, y2)
                     if np.mean(old_base) < tract_base_height:
                         base = old_base
-
 
                 prominences.append(_peak_prominence(trace, peak_idx, peak_base=base, peak_amp=peak_amp))
         else:
@@ -163,8 +173,9 @@ def _tract_adjusted_peak_prominence(trace, labels, tracts, peak_bases=None,
                 peak_amp = _peak_amplitude(trace, peak_idx)
 
             prominences.append(_peak_prominence(trace, peak_idx, peak_base=base, peak_amp=peak_amp))
-    
+
     return prominences
+
 
 def _peak_asymmetry(trace, peak_idx, amp_idx=None):
     '''
@@ -173,9 +184,10 @@ def _peak_asymmetry(trace, peak_idx, amp_idx=None):
     '''
     if amp_idx is None:
         amp_idx, _ = _peak_amplitude(trace, peak_idx)
-        
+
     insert = np.searchsorted(peak_idx, amp_idx)
     return insert / len(peak_idx)
+
 
 def _peak_asymmetry_by_plateau(trace, peak_idx, plateau_idx):
     '''
@@ -187,6 +199,7 @@ def _peak_asymmetry_by_plateau(trace, peak_idx, plateau_idx):
     insert = np.searchsorted(peak_idx, plateau_mid)
     return insert / len(peak_idx)
 
+
 def _peak_amplitude(trace, peak_idx):
     '''
     first attempt, simply returns np max in the range of the peak
@@ -196,14 +209,16 @@ def _peak_amplitude(trace, peak_idx):
     mask = np.zeros_like(trace, dtype=bool)
     mask[peak_idx] = True
     pv = np.where(mask==True, trace, 0)
- 
+
     return np.nanargmax(pv), pv[np.nanargmax(pv)]
+
 
 def _area_under_curve(trace, idx):
     '''
     returns area under curve for the indices provided
     '''
     return simps(trace[idx])
+
 
 def _peak_prominence(trace, peak_idx, peak_base=None, peak_amp=None):
     '''
@@ -216,9 +231,9 @@ def _peak_prominence(trace, peak_idx, peak_base=None, peak_amp=None):
         peak_base = [left_base, right_base]
     else:
         peak_base = [peak_base[0], peak_base[1]]
-        
+
     base_height = np.mean(peak_base)
-        
+
     if peak_amp is None:
         amp_idx, amp = _peak_amplitude(trace, peak_idx)
     else:
@@ -226,11 +241,12 @@ def _peak_prominence(trace, peak_idx, peak_base=None, peak_amp=None):
 
     return amp - base_height, base_height
 
+
 def _time_above_thres(trace, peak_idx, rel_thres=0.5, prominence=None, abs_thres=None):
     '''
     returns number of data points that trace was above thres
     '''
-    
+
     mask = np.zeros_like(trace, dtype=bool)
     mask[peak_idx] = True
     pv = np.where(mask==True, trace, 0)
@@ -247,7 +263,7 @@ def _time_above_thres(trace, peak_idx, rel_thres=0.5, prominence=None, abs_thres
 
     return np.where(pv>=target_thres)[0].shape[0]
 
-def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None, 
+def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         tracts=None, estimate='linear', return_widest=True, amplitude=None, prominence=None, slope_pts=None):
     '''
     any nans present in trace are linearly interpolated to avoid nans in final results
@@ -270,7 +286,7 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         amp_idx, amp = _peak_amplitude(trace, peak_idx)
     else:
         amp_idx, amp = amplitude
-    
+
     if abs_height is None:
 
         if prominence is None:
@@ -285,7 +301,7 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
     if target_height > np.max(pv):
         #height above peak, should return nans so that width becomes nan
         return [(np.nan, np.nan), (np.nan, np.nan)]
-    
+
     all_cross_pts = np.where(np.diff(np.sign(trace - target_height)))[0]
     peak_cross_pts = np.array([a for a in all_cross_pts if a in peak_idx])
 
@@ -304,9 +320,9 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         else:
             crosses = (crosses[first_up_cross], crosses[first_down_cross])
 
-    except IndexError: # really dirty - I should figure out exactly which exceptions might get called 
+    except IndexError:  # really dirty - I should figure out exactly which exceptions might get called
         # this means that it couldn't find one up and one down cross for each
-        # the crosses will have to be recalculated. 
+        # the crosses will have to be recalculated.
         if estimate == 'gauss':
             # TODO FINISH GAUSS
             # Need to find a way to fit a gaussian mixture
@@ -315,11 +331,11 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
             left_slope_pts = slope_pts[0]
             right_slope_pts = slope_pts[1]
 
-            if len(np.where(direction>=0)[0]) > 0: #has an up cross, needs down (right) cross
+            if len(np.where(direction>=0)[0]) > 0:  # has an up cross, needs down (right) cross
                 left_cross = crosses[np.where(direction>=0)[0][0]]
                 right_cross = _linear_interp_x(right_slope_pts[0], right_slope_pts[1], target_height)
 
-            elif len(np.where(direction<0)[0]) > 0: # has a down cross, needs an up (left) cross
+            elif len(np.where(direction<0)[0]) > 0:  # has a down cross, needs an up (left) cross
                 left_cross = _linear_interp_x(left_slope_pts[0], left_slope_pts[1], target_height)
 
                 if return_widest:
@@ -327,7 +343,7 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
                 else:
                     right_cross = crosses[np.where(direction<0)[0][0]]
 
-            else: # has no crosses, estimate both
+            else:  # has no crosses, estimate both
                 left_cross = _linear_interp_x(left_slope_pts[0], left_slope_pts[1], target_height)
                 right_cross = _linear_interp_x(right_slope_pts[0], right_slope_pts[1], target_height)
 
@@ -346,18 +362,21 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
     if len(list(zip(crosses, [target_height for c in crosses]))) >= 1: ## CHECK: should this len == 1 always?
         return list(zip(crosses, [target_height for c in crosses]))
 
+
 def _integrated_activity(trace):
     '''
     Returns integrated activity of the whole trace
     '''
-    temp = np.zeros(trace.shape)
-    return np.array([np.sum(base[:i+1]) for i in np.arange(0, len(base))])
+    return np.array([np.sum(trace[:i+1]) for i in np.arange(0, len(trace))])
+
 
 def _derivative_trace(trace):
     return np.ediff1d(trace, to_begin=0)
 
+
 def _width_at_pts(test_pts):
     return [t[-1][0] - t[0][0] for t in test_pts]
+
 
 def _linear_interp_x(pt1, pt2, test_pt):
     '''
@@ -365,6 +384,7 @@ def _linear_interp_x(pt1, pt2, test_pt):
     test_pt is y value where x is to be estimated
     '''
     return pt1[0] + ((test_pt - pt1[1]) * (pt2[0] - pt1[0])) / (pt2[1] - pt1[1])
+
 
 def _gaussian_fits(trace, labels, tracts, peak_amplitudes=None):
     '''

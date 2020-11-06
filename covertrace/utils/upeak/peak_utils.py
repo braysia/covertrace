@@ -6,10 +6,12 @@ from filter_utils import clean_peaks
 from data_processing import nan_helper_2d
 from upeak_predict import predict_peaks
 
+
 class Peaks(OrderedDict):
 
-    def add_site(self, name, traces, predictions=None, weights=None, model=None, normalize=False, steps=25, 
-            min_seed_prob=0.8, min_peak_prob=0.5, min_seed_length=2):
+    def add_site(self, name, traces, predictions=None, weights=None,
+                 model=None, normalize=False, steps=25, min_seed_prob=0.8,
+                 min_peak_prob=0.5, min_seed_length=2):
         '''
         Run UPeak on traces and save predictions and labels as a new site class.
         Either weights or predictions can be supplied
@@ -17,7 +19,7 @@ class Peaks(OrderedDict):
         #TODO Finish docstring
         #TODO Add type casting for traces
         #NOTE _set_keys2attr() after every cycle is slow, but allows for checking shape during building of peaks class
-        
+
         keyword arguments:
         name -- name of site (if another site of that name exists, it will be overwritten)
         traces -- array containing the trace data that will be used when extracting peak info
@@ -28,7 +30,7 @@ class Peaks(OrderedDict):
                 raise ValueError('Predictions or weights must be supplied.')
             else:
                 predictions = predict_peaks(traces, model=model, weights=weights, normalize=normalize)
-        
+
         no_nan_traces = nan_helper_2d(traces) #nans in peaks can interfere with segmentation, so linear interpolation
         peak_labels, seed_labels = watershed_peak(no_nan_traces, predictions[:, :, 1], predictions[:, :, 2], steps=steps, min_seed_prob=min_seed_prob,
             min_peak_prob=min_peak_prob, min_seed_length=min_seed_length)
@@ -48,14 +50,14 @@ class Peaks(OrderedDict):
         '''
         Depracated in favor of add_site
         Adds site to Peaks class using already generated labels
-        
+
         keyword arguments:
         name -- name of site (if another site of that name exists, it will be overwritten)
         traces -- array containing the trace data that will be used when extracting peak info
         peak_labels -- labels of the peaks
         seed_labels -- labels of the seeds used for watershed peak finding (peak plateaus)
         '''
-        
+
         self[name] = peak_site(traces, peak_labels, seed_labels)
         self._set_keys2attr()
 
@@ -110,7 +112,7 @@ class Peaks(OrderedDict):
 
     def normalize_traces(self, method='base'):
         '''
-        Normalizes traces using method provided. 
+        Normalizes traces using method provided.
         Initial traces are saved in self.raw_traces and remain unchanged. Normalized traces are in self.traces
         If nans were present in traces, those are interpolated
 
@@ -121,15 +123,24 @@ class Peaks(OrderedDict):
         '''
         for key in self.keys():
             self[key]._normalize_traces(method=method)
-        
+
     def amplitude(self, duplicates=True):
         '''
-        Returns: tuple of (x, y) of the highest point in the peak
+        Returns: height of the highest point in the peak
         '''
         for key in self.keys():
             self[key]._get_amplitude(duplicates=duplicates)
-        return [self[key].amplitude for key in self.keys()]
-            
+        return [self[key].amplitude_y for key in self.keys()]
+
+    def amplitude_idx(self, duplicates=True):
+        '''
+        Returns: location of the highest point in the peak
+        These idxs can also be used for the prominence
+        '''
+        for key in self.keys():
+            self[key]._get_amplitude(duplicates=duplicates)
+        return [self[key].amplitude_x for key in self.keys()]
+
     def base(self, adjust_edge=True, dist=4, duplicates=True):
         '''
         Finds base of peak.
@@ -172,7 +183,22 @@ class Peaks(OrderedDict):
 
     def prominence(self, adjust_tracts=True, bi_directional=False, max_gap=12, duplicates=True):
         '''
-        Returns: tuple of (prominence above base_height, base_height)
+        Returns: prominence above base_height
+        prominence is defined in this case as the height of the peak above the base of the peak
+        Use amplitude_idx to get x-value
+
+        keyword arguments:
+        adjust_tracts: if True, the base will be defined as the base of a tract of peaks
+        bi_directional: if True, the base can be made higher or lower based on tracts, if false, only can be lower
+        max_gap: the distance between peaks used for detecting tracts. (only used if adjust_tracts is True)
+        '''
+        for key in self.keys():
+            self[key]._get_prominence(adjust_tracts=adjust_tracts, bi_directional=bi_directional, max_gap=max_gap, duplicates=duplicates)
+        return [self[key].prominence_y for key in self.keys()]
+
+    def prominence_bases(self, adjust_tracts=True, bi_directional=False, max_gap=12, duplicates=True):
+        '''
+        Returns: base_height for each peak with prominence
         prominence is defined in this case as the height of the peak above the base of the peak
 
         keyword arguments:
@@ -182,7 +208,7 @@ class Peaks(OrderedDict):
         '''
         for key in self.keys():
             self[key]._get_prominence(adjust_tracts=adjust_tracts, bi_directional=bi_directional, max_gap=max_gap, duplicates=duplicates)
-        return [self[key].prominence for key in self.keys()]
+        return [self[key].prominence_bases for key in self.keys()]
 
     def peak_area_under_curve(self, duplicates=True):
         '''
@@ -252,6 +278,52 @@ class Peaks(OrderedDict):
 
         return [getattr(self[key], attr) for key in self.keys()]
 
+    def first_times(self, rel_height=None, abs_height=None, duplicates=True):
+        '''
+        Returns the time point of the first point in each peak.
+        Can use either the base or an height. if height is set, that will be used over base
+        Abs_height takes preference over rel_height in functions that are called
+        Best to use base_pts and width first to set optional parameters
+        '''
+
+        if (rel_height is None) and (abs_height is None):
+            for key in self.keys():
+                self[key]._get_peak_base_pts(duplicates=duplicates)
+            return [self[key].first_time_base for key in self.keys()]
+        else:
+            if abs_height is None:
+                pt_attr = 'first_time_rel_{:.2f}'.format(rel_height).replace('.', '_')
+            else:
+                pt_attr = 'first_time_abs_{:.2f}'.format(abs_height).replace('.', '_')
+
+            for key in self.keys():
+                self[key]._get_cross_pts(rel_height=rel_height, abs_height=abs_height, duplicates=duplicates)
+
+            return [getattr(self[key], pt_attr) for key in self.keys()]
+
+    def last_times(self, rel_height=None, abs_height=None, duplicates=True):
+        '''
+        Returns the time point of the last point in each peak.
+        Can use either the base or an height. if height is set, that will be used over base
+        Abs_height takes preference over rel_height in functions that are called
+        Best to use base_pts and width first to set optional parameters
+        '''
+
+        if (rel_height is None) and (abs_height is None):
+            for key in self.keys():
+                self[key]._get_peak_base_pts(duplicates=duplicates)
+            return [self[key].last_time_base for key in self.keys()]
+        else:
+            if abs_height is None:
+                pt_attr = 'last_time_rel_{:.2f}'.format(rel_height).replace('.', '_')
+            else:
+                pt_attr = 'last_time_abs_{:.2f}'.format(abs_height).replace('.', '_')
+
+            for key in self.keys():
+                self[key]._get_cross_pts(rel_height=rel_height, abs_height=abs_height, duplicates=duplicates)
+
+            return [getattr(self[key], pt_attr) for key in self.keys()]
+
     def plateau_width(self, duplicates=True):
         for key in self.keys():
             self[key]._get_plateau_width(duplicates=duplicates)
@@ -288,7 +360,7 @@ class Peaks(OrderedDict):
         can be used to get data from an attribute that is not listed above
         '''
         return [getattr(self[key], attr_name) for key in self.keys()]
-    
+
     def _set_keys2attr(self):
         for key in self.keys():
             setattr(self, key, self[key])
@@ -333,8 +405,7 @@ class peak_site():
             potential_matches = [unique_overlaps[i] for i in range(len(unique_overlaps))
                 if (unique_counts[i] > 4) and (unique_overlaps[i] != n)]
 
-            #must be faster way to do this
-            # not working for multiple peaks, only removes one at a time
+            # must be faster way to do this
             for p in potential_matches:
                 # overlapping points with matching trace
                 overlaps = np.where(self.traces[n] - self.traces[p] == 0)[0]
@@ -349,9 +420,9 @@ class peak_site():
                             # remove indices from peaks and plateaus
                             _peak_remover(self._dedup_peak_idxs[n], peak1)
                             _peak_remover(self._dedup_plateau_idxs[n], self._plateau_idxs[n][p_idx])
-    
+
     def _get_amplitude(self, duplicates=True):
-        
+
         if not hasattr(self, 'amplitude'):
             self.amplitude = []
             for n in range(0, self.traces.shape[0]):
@@ -359,15 +430,20 @@ class peak_site():
                     self.amplitude.append([du._peak_amplitude(self.traces[n], p) for p in self._peak_idxs[n]])
                 else:
                     self.amplitude.append([du._peak_amplitude(self.traces[n], p) for p in self._dedup_peak_idxs[n]])
-        
+
+            # Split values for easier access later
+            # TODO: Rewrite so that the default is returned like this...
+            self.amplitude_x = [[a[i][0] for i in range(len(a))] for a in self.amplitude]
+            self.amplitude_y = [[a[i][1] for i in range(len(a))] for a in self.amplitude]
+
         return self.amplitude
-    
+
     def _get_asymmetry(self, method='plateau', duplicates=True):
-    
+
         if not hasattr(self, 'asymmetry'):
             if (not hasattr(self, 'amplitude')) and (method == 'amplitude'):
                 self._get_amplitude(duplicates=duplicates)
-            
+
             self.asymmetry = []
             for n in range(0, self.traces.shape[0]):
                 # this could create problems if not consistent with using duplicates.
@@ -381,7 +457,7 @@ class peak_site():
                     self.asymmetry.append([du._peak_asymmetry(self.traces[n], p, a[0]) for (p, a) in inputs])
                 elif method == 'amplitude':
                     self.asymmetry.append([du._peak_asymmetry_by_plateau(self.traces[n], p, pl) for (p, pl) in inputs])
-            
+
         return self.asymmetry
 
     def _get_auc(self, area='total', duplicates=True):
@@ -403,9 +479,9 @@ class peak_site():
                     self.total_auc.append(du._area_under_curve(self.traces[n], range(0, self.traces.shape[1])))
 
             return self.total_auc
-    
+
     def _get_peak_base_pts(self, adjust_edge=True, dist=4, duplicates=True):
-        
+
         if not hasattr(self, 'base_pts'):
             self.base_pts = []
             for n in range(0, self.traces.shape[0]):
@@ -414,21 +490,24 @@ class peak_site():
                 else:
                     self.base_pts.append([du._peak_base_pts(self.traces[n], p, adjust_edge, dist) for p in self._dedup_peak_idxs[n]])
 
+            self.first_time_base = [[b[i][0][0] for i in range(len(b))] for b in self.base_pts]
+            self.last_time_base = [[b[i][1][0] for i in range(len(b))] for b in self.base_pts]
+
         return self.base_pts
-    
+
     def _get_base(self, adjust_edge=True, dist=4, duplicates=True):
-        
+
         if not hasattr(self, 'base'):
             if not hasattr(self, 'base_pts'):
                 self.base_pts = self._get_peak_base_pts(adjust_edge=adjust_edge, dist=dist, duplicates=duplicates)
-                
+
             self.base = []
             for n in range(0, self.traces.shape[0]):
                 if duplicates:
                     self.base.append([du._peak_base(self.traces[n], p, bp) for (p, bp) in zip(self._peak_idxs[n], self.base_pts[n])])
                 else:
                     self.base.append([du._peak_base(self.traces[n], p, bp) for (p, bp) in zip(self._dedup_peak_idxs[n], self.base_pts[n])])
-            
+
         return self.base
 
     def _get_integral(self):
@@ -493,12 +572,16 @@ class peak_site():
                     else:
                         self.prominence.append([du._peak_prominence(self.traces[n], p, b, a) for (p, b, a) in zip(self._dedup_peak_idxs[n], self.base[n], self.amplitude[n])])
 
+            self.prominence_y = [[p[i][0] for i in range(len(p))] for p in self.prominence]
+            self.prominence_base = [[p[i][1] for i in range(len(p))] for p in self.prominence]
+
         return self.prominence
 
     def _get_width(self, rel_height=0.5, abs_height=None, estimate='linear', return_widest=True, duplicates=True):
         '''
         needs to be transferred from the ipynb
         if abs_height is not None, then rel_height is ignored
+        TODO: Confirm this function is working
         '''
         if abs_height is None:
             width_attr = 'width_rel_{:.2f}'.format(rel_height).replace('.','_')
@@ -509,7 +592,7 @@ class peak_site():
 
         if not hasattr(self, width_attr):
             #setattr(self, width_attr, [])
-            
+
             if not hasattr(self, cross_attr):
                 setattr(self, cross_attr, self._get_cross_pts(rel_height=rel_height, abs_height=abs_height, estimate=estimate, return_widest=return_widest, duplicates=duplicates))
 
@@ -520,13 +603,15 @@ class peak_site():
     def _get_cross_pts(self, rel_height=0.5, abs_height=None, estimate='linear', return_widest=True, duplicates=True):
 
         if abs_height is None:
-            width_attr = 'width_rel_{:.2f}'.format(rel_height).replace('.','_')
             cross_attr = 'cross_rel_{:.2f}'.format(rel_height).replace('.','_')
+            first_time_attr = 'first_time_rel_{:.2f}'.format(rel_height).replace('.','_')
+            last_time_attr = 'last_time_rel_{:.2f}'.format(rel_height).replace('.','_')
             if not hasattr(self, 'prominence'):
                 self._get_prominence(duplicates=duplicates)
         else:
-            width_attr = 'width_abs_{:.2f}'.format(abs_height).replace('.','_')
             cross_attr = 'cross_abs_{:.2f}'.format(abs_height).replace('.','_')
+            first_time_attr = 'first_time_abs_{:.2f}'.format(abs_height).replace('.','_')
+            last_time_attr = 'last_time_abs_{:.2f}'.format(abs_height).replace('.','_')
 
         if (estimate == 'linear') and (not hasattr(self, 'slope_pts')):
             self._get_slope_pts(duplicates=duplicates)
@@ -545,6 +630,9 @@ class peak_site():
                         a, p, sl) for (pi, a, p, sl) in zip(self._dedup_peak_idxs[n], self.amplitude[n], self.prominence[n], self.slope_pts[n])])
 
                 setattr(self, cross_attr, curr_state)
+
+            setattr(self, first_time_attr, [[c[i][0][0] for i in range(len(c))] for c in getattr(self, cross_attr)])
+            setattr(self, last_time_attr, [[c[i][1][0] for i in range(len(c))] for c in getattr(self, cross_attr)])
 
         return getattr(self, cross_attr)
 
@@ -604,7 +692,7 @@ def watershed_peak(traces, slope_prob, plateau_prob, steps=25, min_seed_prob=0.8
     '''
     Used to segment peaks based on predictions from the CNN model
     traces - trace data for entire site
-    slope_prob - probability array of slope from model (normally output feature 1) 
+    slope_prob - probability array of slope from model (normally output feature 1)
     plateau_prob - proability array of plateau from model (normally output feature 2)
     steps - number of watershed steps to do (more is likely more accurate, but takes longer)
     min_seed_prob - minimum probability of plateau that can be accepted to segment a peak
@@ -643,12 +731,12 @@ def _constant_thres_seg(result, min_prob=0.8, min_length=8, max_gap=2):
 
 def _agglom_watershed_peak_finder(trace, seeds, total_prob, steps=50, min_peak_prob=0.5):
     '''
-    '''    
+    '''
     if (np.sum(seeds) > 0):
         perclist_trace = np.linspace(np.nanmin(trace), np.nanmax(trace), steps)
         prev_t = perclist_trace[-1]
         cand_all = np.where(total_prob >= min_peak_prob)[0]
-        
+
         cand_step = []
         for _t in reversed(perclist_trace):
             seed_idxs = _labels_to_idxs(seeds)
@@ -657,18 +745,18 @@ def _agglom_watershed_peak_finder(trace, seeds, total_prob, steps=50, min_peak_p
             cand = np.intersect1d(cand_all, cand_t)
             cand = np.union1d(seed_idxs, cand)
             prev_t = _t
-            
+
             cand_mask = _idxs_to_mask(trace, cand)
             seeds = watershed(trace, markers=seeds, mask=cand_mask, watershed_line=True, compactness=0)
-        
+
     return seeds
 
 def _idxs_to_labels(trace, seed_idxs):
     labels = np.zeros(trace.shape)
-    
+
     for n, s in enumerate(seed_idxs):
         labels[s] = n + 1
-    
+
     return labels
 
 def _2d_idxs_to_labels(trace, idxs):
@@ -682,14 +770,14 @@ def _2d_idxs_to_labels(trace, idxs):
 
 def _labels_to_idxs(labels):
     return np.where(labels>0)[0]
-    
+
 def _idxs_to_mask(trace, idx):
     mask = np.zeros_like(trace, dtype=bool)
     mask[idx] = True
     return mask
 
 def _labels_to_mask(labels):
-    
+
     if np.ndim(labels) == 2:
         mask_stack = []
         for lab in labels:
@@ -721,7 +809,7 @@ def _labels_to_peak_idxs(labels):
         peak_idxs = []
         for l in np.unique(labels):
                 if l > 0:
-                    peak_idxs.append(np.where(labels==l)[0])    
+                    peak_idxs.append(np.where(labels==l)[0])
         return peak_idxs
 
 def _edge_pts_to_idxs(edge_pts):

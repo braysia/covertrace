@@ -119,6 +119,17 @@ class Sites(OrderedDict):
             self[key] = narr
         self._set_keys2attr()
 
+    def drop_frames(self, FRAME_START=0, FRAME_END=None):
+        for key, arr in self.iteritems():
+            mask = np.ones(arr.shape[1], bool)
+            mask[:FRAME_START] = False
+            if (isinstance(FRAME_END, int)) and (FRAME_END > 0):
+                mask[-FRAME_END:] = False
+            narr = DataArray(arr[:, mask, :], arr.labels)
+            narr._set_extra_attr(narr, arr)
+            self[key] = narr
+        self._set_keys2attr()
+
     def add_median_ratio(self):
         for pos, larr in self.iteritems():
             if 'nuc' in larr.labels[:, 0] and 'cyto' in larr.labels[:, 0]:
@@ -132,7 +143,7 @@ class Sites(OrderedDict):
                     larr = larr.add_prop(label, arr)
                 self[pos] = larr
         self._set_keys2attr()
-        
+
     def blank_prop(self):
         for key, arr in self.iteritems():
             arr.prop = np.zeros(arr.prop.shape)

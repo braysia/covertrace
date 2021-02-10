@@ -124,6 +124,22 @@ class Peaks(OrderedDict):
         for key in self.keys():
             self[key]._normalize_traces(method=method)
 
+    def max_trace(self):
+        '''
+        Returns maximum value of trace
+        '''
+        for key in self.keys():
+            self[key]._get_trace_max_min()
+        return [self[key].max_trace for key in self.keys()]
+
+    def min_trace(self):
+        '''
+        Returns minimum value of trace
+        '''
+        for key in self.keys():
+            self[key]._get_trace_max_min()
+        return [self[key].min_trace for key in self.keys()]
+
     def amplitude(self, duplicates=True):
         '''
         Returns: height of the highest point in the peak
@@ -181,6 +197,37 @@ class Peaks(OrderedDict):
             self[key]._get_peak_base_pts(adjust_edge=adjust_edge, dist=dist, duplicates=duplicates)
         return [self[key].base_pts for key in self.keys()]
 
+    def time_above_thres(self, rel_thres=0.5, abs_thres=None):
+        '''
+        '''
+        for key in self.keys():
+            self[key]._get_time_above_thres(rel_thres=rel_thres, abs_thres=abs_thres)
+        return [self[key].time_above_thres for key in self.keys()]
+
+    def consecutive_time_above_thres(self, rel_thres=0.5, abs_thres=None):
+        '''
+        '''
+        for key in self.keys():
+            self[key]._get_time_above_thres(rel_thres=rel_thres, abs_thres=abs_thres)
+        return [self[key].consec_time_above_thres for key in self.keys()]
+
+    def active_cell(self):
+        '''
+        Based on peaks, returns a trace with a for each pt in a peak and 0 otherwise
+        '''
+        for key in self.keys():
+            self._get_cell_activity()
+        return [self[key].active_cell for key in self.keys()]
+
+    def cumulative_active_cell(self):
+        '''
+        Based on peaks, returns a trace with 1s for each pt from the first pt
+        in a peak till the end of the trace, 0 otherwise
+        '''
+        for key in self.keys():
+            self._get_cell_activity()
+        return [self[key].cumulative_active_cell for key in self.keys()]
+
     def prominence(self, adjust_tracts=True, bi_directional=False, max_gap=12, duplicates=True):
         '''
         Returns: prominence above base_height
@@ -226,6 +273,16 @@ class Peaks(OrderedDict):
             self[key]._get_auc(area='total')
         return [self[key].total_auc for key in self.keys()]
 
+    def window_area_under_curve(self, win_size=5):
+        '''
+        Calculates area under the curve for each window of size win
+        Returned as list of AUC for index i:i+winsize for every applicable i in trace
+        '''
+        for key in self.keys():
+            self[key]._get_auc_in_window(win_size)
+        attr_name = 'auc_window_size_{0}'.format(int(win_size))
+        return [getattr(self[key], attr_name) for key in self.keys()]
+
     def integral(self):
         '''
         Returns integrated activity over time
@@ -241,6 +298,22 @@ class Peaks(OrderedDict):
         for key in self.keys():
             self[key]._get_derivative()
         return [self[key].derivative for key in self.keys()]
+
+    def max_derivative(self):
+        '''
+        Returns maximum value of the derivative for each cell
+        '''
+        for key in self.keys():
+            self[key]._get_derivative()
+        return [self[key].max_derivative for key in self.keys()]
+
+    def min_derivative(self):
+        '''
+        Returns minimum value of the derivative for each cell
+        '''
+        for key in self.keys():
+            self[key]._get_derivative()
+        return [self[key].min_derivative for key in self.keys()]
 
     def width(self, rel_height=0.5, abs_height=None, estimate='linear', return_widest=True, duplicates=True):
         '''
@@ -421,6 +494,14 @@ class peak_site():
                             _peak_remover(self._dedup_peak_idxs[n], peak1)
                             _peak_remover(self._dedup_plateau_idxs[n], self._plateau_idxs[n][p_idx])
 
+    def _get_trace_max_min(self);
+
+        if not hasattr(self, 'max_trace'):
+            self.max_trace = [du._trace_max(t) for t in self.traces]
+            self.min_trace = [du._trace_min(t) for t in self.traces]
+
+        return self.max_trace, self.min_trace
+
     def _get_amplitude(self, duplicates=True):
 
         if not hasattr(self, 'amplitude'):
@@ -480,6 +561,17 @@ class peak_site():
 
             return self.total_auc
 
+    def _get_auc_in_window(self, win_size=None):
+
+        assert isinstance(win_size, int), 'Window size is based on frames and must be int'
+
+        attr_name = 'auc_window_size_{0}'.format(int(win_size))
+
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, [du._auc_in_window(t, win_size) for t in self.traces])
+
+        return getattr(self, attr_name)
+
     def _get_peak_base_pts(self, adjust_edge=True, dist=4, duplicates=True):
 
         if not hasattr(self, 'base_pts'):
@@ -524,8 +616,12 @@ class peak_site():
 
         if not hasattr(self, 'derivative'):
             self.derivative = []
+            self.max_derivative = []
+            self.min_derivative = []
             for n in range(self.traces.shape[0]):
                 self.derivative.append(du._derivative_trace(self.traces[n]))
+                self.max_derivative.append(du._trace_max(self.derivative[-1]))
+                self.min_derivative.append(du._trace_min(self.derivative[-1]))
 
         return self.derivative
 
@@ -540,6 +636,32 @@ class peak_site():
                     self.tracts.append(du._detect_peak_tracts(self.traces[n], self._dedup_peak_labels[n], max_gap=max_gap))
 
         return self.tracts
+
+    def _get_time_above_thres(self, rel_thres=0.5, abs_thres=None):
+        '''
+        duplicates shouldn't matter for this.
+
+        Becuase these happen in the same loop, I could probably make the du function a single function as well
+        '''
+        if not hasattr(self, 'time_above_thres'):
+            self.time_above_thres = []
+            self.consec_time_above_thres = []
+            for n in range(self.traces.shape[0]):
+                self.time_above_thres.append(du._time_above_thres(self.traces[n], rel_thres, abs_thres))
+                self.time_above_thres.append(du._consecutive_time_above_thres(self.traces[n], rel_thres, abs_thres))
+
+        return self.time_above_thres
+
+    def _get_cell_activity(self):
+        '''
+        should duplicates be added to this function?
+        '''
+        if not hasattr(self, 'active_cell'):
+            self.active_cell = []
+            self.cumulative_active_cell = []
+            for n in range(self.traces.shape[0]):
+                self.active_cell.append(du._active_cell(self.traces[n], self.peak_idxs[n]))
+                self.cumulative_active_cell.append(du._cumulative_active(self.traces[n], self.peak_idxs[n]))
 
     def _get_prominence(self, adjust_tracts=True, bi_directional=False, max_gap=10, duplicates=True):
         '''

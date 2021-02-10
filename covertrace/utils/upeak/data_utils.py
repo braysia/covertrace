@@ -219,6 +219,29 @@ def _area_under_curve(trace, idx):
     '''
     return simps(trace[idx])
 
+def _auc_in_window(trace, win_size):
+    '''
+    TODO:
+        Needs to be tested
+        Add ability to set time
+    '''
+    return [simps(trace[i: i + win_size]) for i in np.arange((length + 1) - win_size)]
+
+    ### FROM UPEAK FOR PICKING ALL TRACE WINDOWS IN TRACE.
+
+    # def pick_all_positions(traces, length=128):
+    # first_nan = np.logical_not(np.isnan(traces)).argmin(axis=1)
+
+    # positions = []
+    # for i, fn in enumerate(first_nan):
+    #     if len(fn) > 1: #required if more than one input feature. All fn should be identical
+    #         fn = fn[0]
+    #     end = fn if fn > 0 else traces.shape[1]
+    #     if end - length >= 0:
+    #         cols = np.arange(0, end - length)
+    #         positions.extend([(i, y) for y in cols])
+
+    # return positions
 
 def _peak_prominence(trace, peak_idx, peak_base=None, peak_amp=None):
     '''
@@ -241,27 +264,101 @@ def _peak_prominence(trace, peak_idx, peak_base=None, peak_amp=None):
 
     return amp - base_height, base_height
 
-
-def _time_above_thres(trace, peak_idx, rel_thres=0.5, prominence=None, abs_thres=None):
+def _points_above_thres(trace, rel_thres=0.5, abs_thres=None):
     '''
-    returns number of data points that trace was above thres
+    Returns frames in trace that are above 0
+    Rel_thres is relative to the maximum of the trace.
+    Only used if abs_thres is None.
     '''
-
-    mask = np.zeros_like(trace, dtype=bool)
-    mask[peak_idx] = True
-    pv = np.where(mask==True, trace, 0)
-
-    if prominence is None:
-        prominence, base = _peak_prominence(trace, peak_idx)
-    else:
-        prominence, base = prominence
 
     if abs_thres is None:
-        target_thres = (prominence * rel_height) + base
+        target_thres = rel_thres * np.nanmax(trace)
     else:
         target_thres = abs_thres
 
-    return np.where(pv>=target_thres)[0].shape[0]
+    return np.where(trace >= target_thres)[0]
+
+def _time_above_thres(trace, rel_thres=0.5, abs_thres=None):
+    '''
+    This is not set up right... This shouldn't depend on peaks. This is a trace property.
+    In that sense as well, using rel_thres doesn't make a lot of sense...
+    I mean, in general the traces will have to be normalized in someway for this to make sense.
+    Also, there is no call to this function in peak utils, so i have full freedom with the args.
+
+    returns number of data points that trace was above thres
+    '''
+    pts = _points_above_thres(trace, rel_thres, abs_thres)
+
+    return pts.shape[0]
+
+def _consecutive_time_above_thres(trace, rel_thres=0.5, abs_thres=None):
+    '''
+    returns longest consecutive number of data points that trace was above thres
+
+    TODO:
+        Shold this also return where that stretch starts?
+        NEEDS TO BE TESTED
+    '''
+
+    all_above_thres = _points_above_thres(trace, rel_thres, abs_thres)
+    diffs = np.ediff1d(all_above_thres, to_begin=1)
+    splits = np.where(diffs > 1)[0]
+    times = np.split(all_above_thres, splits)
+
+    return np.max(np.array([len(t) for t in times]))
+
+
+    # THIS IS FROM PEAK UTILS FOR REFERENCE
+
+    # def _constant_thres_seg(result, min_prob=0.8, min_length=8, max_gap=2):
+    # '''
+    # 1D only currently
+    # min_prob is the minimum value for a point to be considered
+    # min_length is the minimum length of consecutive points to be kept
+    # max_gap is how many points can be missing from a peak
+    # '''
+    # candidates = np.where(result>min_prob)[0]
+    # diffs = np.ediff1d(candidates, to_begin=1)
+    # bounds = np.where(diffs>max_gap)[0] #find where which stretchs of points are separated by more than max_gap
+    # peak_idxs = [p for p in np.split(candidates, bounds) if len(p)>=min_length]
+
+    #return peak_idxs
+
+def _active_by_time(trace, peak_idx):
+    '''
+    1 if the point is within a peak, 0 otherwise
+
+    NEEDS TO BE TESTED
+    '''
+    arr = np.zeros(trace.shape)
+    arr[peak_idx] = 1
+    return arr
+
+def _cumulative_active(trace, peak_idx):
+    '''
+    1 if the point is after the first time of first peak
+    0 otherwise
+
+    NEEDS TO BE TESTED
+    '''
+    arr = np.zeros(trace.shape)
+
+    if len(peak_idx) > 0:
+        arr[peak_idx[0]:] = 1
+
+    return arr
+
+def _trace_max(trace):
+    '''
+    Use this function to get derivative max as well
+    '''
+    return trace.max()
+
+def _trace_min(trace):
+    '''
+    Use this function to get derivative min as well
+    '''
+    return trace.min()
 
 def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
         tracts=None, estimate='linear', return_widest=True, amplitude=None, prominence=None, slope_pts=None):
@@ -366,9 +463,11 @@ def _get_crosses_at_height(trace, peak_idx, rel_height=0.5, abs_height=None,
 def _integrated_activity(trace):
     '''
     Returns integrated activity of the whole trace
-    '''
-    return np.array([np.sum(trace[:i+1]) for i in np.arange(0, len(trace))])
 
+    TODO:
+        Should use np.cumsum
+    '''
+    return np.array([np.sum(trace[:i+1]) for i in np.arange(len(trace))])
 
 def _derivative_trace(trace):
     return np.ediff1d(trace, to_begin=0)

@@ -328,8 +328,11 @@ def _active_by_time(trace, peak_idx):
     '''
     1 if the point is within a peak, 0 otherwise
     '''
+
     arr = np.zeros(trace.shape)
-    arr[peak_idx] = 1
+    if len(peak_idx) > 0:
+        arr[np.concatenate(peak_idx)] = 1
+
     return arr
 
 def _cumulative_active(trace, peak_idx):

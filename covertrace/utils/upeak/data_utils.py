@@ -225,7 +225,7 @@ def _auc_in_window(trace, win_size):
         Needs to be tested
         Add ability to set time
     '''
-    return [simps(trace[i: i + win_size]) for i in np.arange((length + 1) - win_size)]
+    return np.array([simps(trace[i: i + win_size]) for i in np.arange((len(trace) + 1) - win_size)])
 
     ### FROM UPEAK FOR PICKING ALL TRACE WINDOWS IN TRACE.
 
@@ -327,8 +327,6 @@ def _consecutive_time_above_thres(trace, rel_thres=0.5, abs_thres=None):
 def _active_by_time(trace, peak_idx):
     '''
     1 if the point is within a peak, 0 otherwise
-
-    NEEDS TO BE TESTED
     '''
     arr = np.zeros(trace.shape)
     arr[peak_idx] = 1
@@ -338,13 +336,10 @@ def _cumulative_active(trace, peak_idx):
     '''
     1 if the point is after the first time of first peak
     0 otherwise
-
-    NEEDS TO BE TESTED
     '''
     arr = np.zeros(trace.shape)
-
     if len(peak_idx) > 0:
-        arr[peak_idx[0]:] = 1
+        arr[peak_idx[0][0]:] = 1
 
     return arr
 

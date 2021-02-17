@@ -216,7 +216,7 @@ class Peaks(OrderedDict):
         Based on peaks, returns a trace with a for each pt in a peak and 0 otherwise
         '''
         for key in self.keys():
-            self._get_cell_activity()
+            self[key]._get_cell_activity()
         return [self[key].active_cell for key in self.keys()]
 
     def cumulative_active_cell(self):
@@ -225,7 +225,7 @@ class Peaks(OrderedDict):
         in a peak till the end of the trace, 0 otherwise
         '''
         for key in self.keys():
-            self._get_cell_activity()
+            self[key]._get_cell_activity()
         return [self[key].cumulative_active_cell for key in self.keys()]
 
     def prominence(self, adjust_tracts=True, bi_directional=False, max_gap=12, duplicates=True):
@@ -494,7 +494,7 @@ class peak_site():
                             _peak_remover(self._dedup_peak_idxs[n], peak1)
                             _peak_remover(self._dedup_plateau_idxs[n], self._plateau_idxs[n][p_idx])
 
-    def _get_trace_max_min(self);
+    def _get_trace_max_min(self):
 
         if not hasattr(self, 'max_trace'):
             self.max_trace = [du._trace_max(t) for t in self.traces]
@@ -648,7 +648,7 @@ class peak_site():
             self.consec_time_above_thres = []
             for n in range(self.traces.shape[0]):
                 self.time_above_thres.append(du._time_above_thres(self.traces[n], rel_thres, abs_thres))
-                self.time_above_thres.append(du._consecutive_time_above_thres(self.traces[n], rel_thres, abs_thres))
+                self.consec_time_above_thres.append(du._consecutive_time_above_thres(self.traces[n], rel_thres, abs_thres))
 
         return self.time_above_thres
 
@@ -660,8 +660,8 @@ class peak_site():
             self.active_cell = []
             self.cumulative_active_cell = []
             for n in range(self.traces.shape[0]):
-                self.active_cell.append(du._active_cell(self.traces[n], self.peak_idxs[n]))
-                self.cumulative_active_cell.append(du._cumulative_active(self.traces[n], self.peak_idxs[n]))
+                self.active_cell.append(du._active_by_time(self.traces[n], self._peak_idxs[n]))
+                self.cumulative_active_cell.append(du._cumulative_active(self.traces[n], self._peak_idxs[n]))
 
     def _get_prominence(self, adjust_tracts=True, bi_directional=False, max_gap=10, duplicates=True):
         '''
@@ -953,4 +953,5 @@ def _peak_remover(peak_list, removed_peak):
         peak_list.pop(idx)
     else:
         # This should not happen
-        raise ValueError('Peak not found.')
+        pass
+        #raise ValueError('Peak not found.')
